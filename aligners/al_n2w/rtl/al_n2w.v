@@ -12,7 +12,7 @@
 //|    3. Aligner advances only at input valid indicator high (vld_in)                 |//
 //|    4. ter_in terminates the current transaction, outputs a valid out (vld_out)     |//
 //|       indicator high and the currently gathered data as output (data_out)          |//
-//|    5. ptr output signals the aligner internal pointer, it is a RATIO_WID bits       |//
+//|    5. ptr output signals the aligner internal pointer, it is a RATIO_WID bits      |//
 //|       register that holds the number of valid inputs gathered in the aligner       |//
 //|       a. ptr=0 --> aligner is empty                                                |//
 //|       b. ptr=RATIO_VAL-1 --> aligner is full, next valid input will triger a       |//

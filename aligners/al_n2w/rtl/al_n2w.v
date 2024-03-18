@@ -21,8 +21,8 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
 module al_n2w #(
-    parameter WID_IN     =                8  , // Input width in bits
-    parameter WID_OUT    =               64  , // Output width in bits
+    parameter WID_IN     =                4  , // Input width in bits
+    parameter WID_OUT    =                16 , // Output width in bits
     localparam RATIO_VAL = WID_OUT / WID_IN  , // Ratio (input width / output width)
     localparam RATIO_WID = $clog2(RATIO_VAL) , // Ratio width in bits
     localparam INT_WID   = 32                  // Width of integer in bits
@@ -85,19 +85,15 @@ generate
     end
 endgenerate
 
-// valid output register // 
-assign vld_out_next = (full & vld_in) ; 
-
-always_ff @( posedge clk, negedge rst_n ) begin : vld_out_reg
-    if (!rst_n) begin // reset
-        vld_out <= 1'b0 ; 
-    end
-    else begin // sample
-        vld_out <= vld_out_next ; 
-    end
-end
+// valid out logic // 
+assign vld_out = (full & vld_in) ; 
 
 // Data output assembly // 
 assign data_out = {data_in, int_strg} ; // Output data is the concat of input data at the MSword and int_strg after that
+
+initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars(1, al_n2w);
+end
 
 endmodule

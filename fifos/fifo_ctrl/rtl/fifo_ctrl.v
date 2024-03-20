@@ -1,6 +1,6 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 //|                                                                                    |//
-//| ~~ basic_fifo_ctrl ~~                                                              |//
+//| ~~ fifo_ctrl ~~                                                                    |//
 //|                                                                                    |//
 //| Top-level description:                                                             |//
 //|    1. Basic FIFO control                                                           |//
@@ -15,7 +15,7 @@
 //|                                                                                    |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
-module basic_fifo_ctrl #(
+module fifo_ctrl #(
     parameter                    DEPTH   = 16                         , // FIFO depth 
     localparam                   PTR_WID = $clog2(DEPTH)              , // Pointers width
     localparam bit [PTR_WID-1:0] PTR_ZER = {(PTR_WID){1'b0}}          , // Pointer-wid 1 value
@@ -68,13 +68,13 @@ assign count_next     = inc_count_cond ? (count + CNT_ONE)                      
                                          (count          )                         ; // Next count value logic
 // Read pointer // 
 assign inc_rd_cond    = (oen) & (~(empty))                                         ; // Increase read pointer if readout valid data
-assign rd_wrap_cond   = ({{(32-PTR_WID){1'b0}} , rd_ptr} == DEPTH) & (inc_rd_cond) ; // Condition to wrap around rd pointer to base
+assign rd_wrap_cond   = ({{(32-PTR_WID){1'b0}},rd_ptr}==(DEPTH-1)) & (inc_rd_cond) ; // Condition to wrap around rd pointer to base
 assign rd_ptr_next    = rd_wrap_cond ? PTR_ZER                                     : 
                         inc_rd_cond  ? (rd_ptr + PTR_ONE)                          : 
                                         rd_ptr                                     ; // Next read pointer value logic
 // Write pointer // 
 assign inc_wr_cond    = (wen) & (~(full))                                          ; // Increase write pointer if there is place available
-assign wr_wrap_cond   = ({{(32-PTR_WID){1'b0}} , wr_ptr} == DEPTH) & (inc_wr_cond) ; // Condition to wrap around wr pointer to base
+assign wr_wrap_cond   = ({{(32-PTR_WID){1'b0}},wr_ptr}==(DEPTH-1)) & (inc_wr_cond) ; // Condition to wrap around wr pointer to base
 assign wr_ptr_next    = wr_wrap_cond ? PTR_ZER                                     : 
                         inc_wr_cond  ? (wr_ptr + PTR_ONE)                          : 
                                         wr_ptr                                     ; // Next read pointer value logic

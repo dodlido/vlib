@@ -52,7 +52,7 @@ assign masked_wr = wen & enable ;
 assign masked_rd = oen & enable ; 
 
 // Generate write pipe // 
-pipe #(.DEPTH(W_DLY), .WID(DAT_W + ADD_W + 1)) wr_pipe (
+pipe #(.DEPTH(W_DLY-1), .WID(DAT_W + ADD_W + 1)) wr_pipe (
     .clk      (clk                                      ),
     .rst_n    (rst_n                                    ),
     .data_in  ({dat_in      , add         , masked_wr  }),

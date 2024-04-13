@@ -113,3 +113,12 @@ always_ff @( posedge clk, negedge rst_n ) begin : wr_ptr_reg
 end
 
 endmodule
+
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
+//|                                               |//
+//| 1. Project  :  vlib                           |//
+//| 2. Author   :  Etay Sela                      |//
+//| 3. Date     :  2024-04-14                     |//
+//| 4. Version  :  v0.3.0                         |//
+//|                                               |//
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//

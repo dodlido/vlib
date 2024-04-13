@@ -1,6 +1,0 @@
-<testsuites name="results">
-  <testsuite name="all" package="all">
-    <property name="random_seed" value="1710347963" />
-    <testcase name="my_test" classname="al_n2w_tb" file="c:\Users\User1\vlib\aligners\al_n2w\tb\al_n2w_tb.py" lineno="23" time="0.010528087615966797" sim_time_ns="27.001" ratio_time="2564.6633068526658" />
-  </testsuite>
-</testsuites>

@@ -1,6 +1,0 @@
-makefile
-design.fl
-sim_build/
-__pycache__/
-dump.vcd
-results.xml

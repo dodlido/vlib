@@ -8,11 +8,11 @@
 //| Features:                                                                          |//
 //|    1. Parameterized write and read delays                                          |//
 //|    2. Parameterized address and data widths                                        |//
-//|    2. Parameterized memory depth                                                   |//
+//|    3. Parameterized memory depth                                                   |//
 //|                                                                                    |//
 //| Requirements:                                                                      |//
 //|    1. R_DLY, W_DLY >= 1                                                            |//
-//|    1. DEPTH <= 2^32 - 1                                                            |//
+//|    2. DEPTH <= 2^32 - 1                                                            |//
 //|                                                                                    |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 

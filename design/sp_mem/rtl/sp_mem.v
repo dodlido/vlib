@@ -95,9 +95,9 @@ endmodule
 
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 //|                                               |//
-//| 1. Project  :  /home/etay-sela/design/veri_home/erim/vlib|//
+//| 1. Project  :  vlib                           |//
 //| 2. Author   :  Etay Sela                      |//
 //| 3. Date     :  2024-06-08                     |//
-//| 4. Version  :  v0.5.0                         |//
+//| 4. Version  :  v0.6.0                         |//
 //|                                               |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//

@@ -3,11 +3,13 @@
 //| ~~ pipe ~~                                                                         |//
 //|                                                                                    |//
 //| Top-level description:                                                             |//
-//|    1. Configurable delay                                                           |//
+//|    1. Parameterizable delay                                                        |//
 //|                                                                                    |//
 //| Features:                                                                          |//
 //|    1. Parameterized pipe depth (DEPTH)                                             |//
-//|    2. Pipe advances every cycle                                                    |//
+//|    2. Parameterized low power mode (LOW_PWR_OPT) - if active, FFs in pipe sample   |//
+//|       only if previous stage valid indicator is active (high)                      |//
+//|    3. Pipe advances every cycle                                                    |//
 //|                                                                                    |//
 //| Requirements:                                                                      |//
 //|    1. DEPTH >= 1                                                                   |//
@@ -15,54 +17,48 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
 module pipe #(
-    parameter DEPTH = 4 , // Pipe depth
-    parameter WID   = 8   // Data width
+   parameter           DEPTH       =    4 , // Pipe depth
+   parameter           WID         =    8 , // Data width
+   parameter bit [0:0] LOW_PWR_OPT = 1'b1   // Low power mode option 
 ) (
-    // General // 
-    input wire [    0:0] clk     , // clock signal
-    input wire [    0:0] rst_n   , // Async reset, active low
-    // Input data // 
-    input wire [WID-1:0] data_in , // Input data
-    // Output data // 
-    output reg [WID-1:0] data_out  // Output data
+   // General // 
+   input wire [    0:0] clk     , // clock signal
+   input wire [    0:0] rst_n   , // Async reset, active low
+   // Input data // 
+   input wire [WID-1:0] dat_in  , // Input data
+   input wire [    0:0] vld_in  , // Input valid indicator
+   // Output data // 
+   output reg [WID-1:0] dat_out , // Output data
+	output reg [    0:0] vld_out   // Output valid indicator
 );
 
 // Pipe interconnects declaration // 
-wire [DEPTH-1:0][WID-1:0] pipe_cncts ; 
+typedef struct packed {
+   logic [WID-1:0] dat ; 
+   logic [    0:0] vld ;
+} pipe_cell_s ; 
+pipe_cell_s [DEPTH:0] pipe_cncts ; 
 
-// Pipe first stage // 
-base_reg #(.WID(WID)) i_base_reg (
-    .clk          (clk             ),
-    .rst_n        (rst_n           ),
-    .en           (1'b1            ),
-    .data_in      (data_in         ),
-    .data_out     (pipe_cncts[0]   )
-); 
+// Connecting first stage to input // 
+assign pipe_cncts[0].dat = dat_in ; 
+assign pipe_cncts[0].vld = vld_in ; 
 
 // Pipe internal stages generation // 
-genvar st ; 
+genvar ST ; 
 generate
-    for (st = 1; st<DEPTH; st=st+1) begin : gen_pipe_loop
-        base_reg #(.WID(WID)) i_base_reg (
-            .clk          (clk             ),
-            .rst_n        (rst_n           ),
-            .en           (1'b1            ),
-            .data_in      (pipe_cncts[st-1]),
-            .data_out     (pipe_cncts[st]  )
-        ); 
-    end
+   for (ST = 0; ST<DEPTH; ST++) begin : gen_pipe_loop
+      base_reg #(.WID(WID+1)) i_base_reg (
+         .clk          ( clk                                        ),
+         .rst_n        ( rst_n                                      ),
+         .en           ( pipe_cncts[ST].vld |  LOW_PWR_OPT          ),
+         .data_in      ({pipe_cncts[ST].dat  , pipe_cncts[ST].vld  }),
+         .data_out     ({pipe_cncts[ST+1].dat, pipe_cncts[ST+1].vld})
+      ); 
+   end
 endgenerate
 
-// Connect between pipe final stage and output
-assign data_out = pipe_cncts[DEPTH-1] ; 
+// Connecting last stage to output // 
+assign dat_out = pipe_cncts[DEPTH].dat ; 
+assign vld_out = pipe_cncts[DEPTH].vld ; 
 
 endmodule
-
-//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
-//|                                               |//
-//| 1. Project  :  vlib                           |//
-//| 2. Author   :  Etay Sela                      |//
-//| 3. Date     :  2024-06-08                     |//
-//| 4. Version  :  v0.6.0                         |//
-//|                                               |//
-//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//

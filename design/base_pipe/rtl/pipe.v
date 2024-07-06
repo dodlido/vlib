@@ -62,3 +62,12 @@ assign dat_out = pipe_cncts[DEPTH].dat ;
 assign vld_out = pipe_cncts[DEPTH].vld ; 
 
 endmodule
+
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
+//|                                               |//
+//| 1. Project  :  vlib                           |//
+//| 2. Author   :  Etay Sela                      |//
+//| 3. Date     :  2024-07-06                     |//
+//| 4. Version  :  v0.5.0                         |//
+//|                                               |//
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//

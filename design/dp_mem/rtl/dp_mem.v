@@ -1,9 +1,9 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 //|                                                                                    |//
-//| ~~ sp_mem ~~                                                                       |//
+//| ~~ dp_mem ~~                                                                       |//
 //|                                                                                    |//
 //| Top-level description:                                                             |//
-//|    1. Single-port register based memory                                            |//
+//|    1. Dual-port register based memory                                              |//
 //|                                                                                    |//
 //| Features:                                                                          |//
 //|    1. Parameterized delays:                                                        |//
@@ -19,6 +19,9 @@
 //|       b. BIT_EN      - bit-enable option, if active memory write data is the result|//
 //|                        of bit-wise and operation between dat_in and bit_sel        |//
 //|                        o.w, bit-sel is ignored                                     |//
+//|       c. WR2RD_OPT   - option to specify how to handle write-to-read events:       |//
+//|                        i.  '0' - read data presents the previous cell state        |//
+//|                        ii. '1' - write data is forwarded to read data              |//
 //|                                                                                    |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
@@ -32,7 +35,8 @@ module sp_mem #(
     parameter int       DLY_MEM2USER = 0             , // Memory to user delay in cycles
     // Option parameters // 
     parameter bit [0:0] LOW_PWR_OPT  = 1'b1          , // Low power mode option
-    parameter bit [0:0] BIT_EN_OPT   = 1'b0            // Bit-enable mechanism option
+    parameter bit [0:0] BIT_EN_OPT   = 1'b0          , // Bit-enable mechanism option
+    parameter bit [0:0] WR2RD_OPT    = 1'b0            // Write-to-read option
 )(
     // General // 
     input wire [      0:0] clk     , // clock signal
@@ -40,7 +44,8 @@ module sp_mem #(
     // Input control // 
     input wire [      0:0] cs      , // Chip-select 
     input wire [      0:0] wen     , // Write enable
-    input wire [ADD_W-1:0] add     , // Address  
+    input wire [ADD_W-1:0] add_rd  , // Read Address  
+    input wire [ADD_W-1:0] add_wr  , // Write Address  
     // Input data // 
     input wire [DAT_W-1:0] dat_in  , // Input data
     input wire [DAT_W-1:0] bit_sel , // bit-select
@@ -49,42 +54,52 @@ module sp_mem #(
 );
 
 // Internal wires declaration // 
-wire            [      0:0] masked_wr                ; 
-wire            [      0:0] masked_rd                ;
 wire            [DAT_W-1:0] mem_dat_in               ;
 wire            [DAT_W-1:0] mem_dat_in_post_bit_sel  ;
-wire            [ADD_W-1:0] mem_add                  ;
-wire            [      0:0] mem_wr                   ;
-wire            [      0:0] mem_cs                   ;
+wire            [ADD_W-1:0] mem_add_rd               ;
+wire            [ADD_W-1:0] mem_add_wr               ;
+wire            [      0:0] mem_wen                  ;
 wire            [DAT_W-1:0] mem_dat_out              ;
 wire [DEPTH-1:0][DAT_W-1:0] mem_array                ; 
 reg  [DEPTH-1:0]            mem_wen_vec              ;
-
-// Mask write and read with master enable // 
-assign masked_wr =  wen & cs ; 
-assign masked_rd = ~wen & cs ; 
 
 // Generate data input from user side // 
 generate
    if (BIT_EN_OPT) begin: gen_bit_en_cond // BIT_EN_OPT is on, propagate bit_sel
       wire [DAT_W-1:0] mem_bit_sel ; 
-      pipe #(.DEPTH(DLY_USER2MEM), .WID(2*DAT_W+ADD_W+1). LOW_PWR_OPT(LOW_PWR_OPT)) i0_ctrl_pipe (
-         .clk      (clk                                          ),
-         .rst_n    (rst_n                                        ),
-         .data_in  ({bit_sel    , dat_in    , add    , masked_wr}),
-         .vld_in   (cs                                           ),
-         .data_out ({mem_bit_sel, mem_dat_in, mem_add, mem_wr   }),
-         .vld_out  (mem_cs                                       )
+      pipe #(.DEPTH(DLY_USER2MEM), .WID(2*DAT_W+ADD_W). LOW_PWR_OPT(LOW_PWR_OPT)) i0_wr_ctrl_pipe (
+         .clk      (clk                                  ),
+         .rst_n    (rst_n                                ),
+         .data_in  ({bit_sel    , dat_in    , add_wr    }),
+         .vld_in   (wen & cs                             ),
+         .data_out ({mem_bit_sel, mem_dat_in, mem_add_wr}),
+         .vld_out  (mem_wen                              )
+      ); 
+      pipe #(.DEPTH(DLY_USER2MEM), .WID(ADD_W). LOW_PWR_OPT(LOW_PWR_OPT)) i0_rd_ctrl_pipe (
+         .clk      (clk       ),
+         .rst_n    (rst_n     ),
+         .data_in  (add_rd    ),
+         .vld_in   (cs        ),
+         .data_out (mem_add_rd),
+         .vld_out  (          )  // NC
       ); 
    end
    else begin: gen_bit_dis_cond // BIT_EN_OPT is off, don't propagate bit_sel
-      pipe #(.DEPTH(DLY_USER2MEM), .WID(DAT_W+ADD_W+1). LOW_PWR_OPT(LOW_PWR_OPT)) i1_ctrl_pipe (
-         .clk      (clk                             ),
-         .rst_n    (rst_n                           ),
-         .data_in  ({dat_in    , add    , masked_wr}),
-         .vld_in   (cs                              ),
-         .data_out ({mem_dat_in, mem_add, mem_wr   }),
-         .vld_out  (mem_cs                          )
+      pipe #(.DEPTH(DLY_USER2MEM), .WID(DAT_W+ADD_W). LOW_PWR_OPT(LOW_PWR_OPT)) i1_wr_ctrl_pipe (
+         .clk      (clk                     ),
+         .rst_n    (rst_n                   ),
+         .data_in  ({dat_in    , add_wr    }),
+         .vld_in   (wen & cs                ),
+         .data_out ({mem_dat_in, mem_add_wr}),
+         .vld_out  (mem_wen                 )
+      ); 
+      pipe #(.DEPTH(DLY_USER2MEM), .WID(ADD_W). LOW_PWR_OPT(LOW_PWR_OPT)) i1_rd_ctrl_pipe (
+         .clk      (clk       ),
+         .rst_n    (rst_n     ),
+         .data_in  (add_rd    ),
+         .vld_in   (cs        ),
+         .data_out (mem_add_rd),
+         .vld_out  (          )  // NC
       ); 
    end
 endgenerate
@@ -105,7 +120,7 @@ generate
       end
 
       // Write enable for each individual memory cell // 
-      mem_wen_vec[ADD_IDX] = (ADD_IDX[ADD_W-1:0]==mem_add) & mem_wr ; 
+      mem_wen_vec[ADD_IDX] = (ADD_IDX[ADD_W-1:0]==mem_add_wr) & mem_wen ; 
  
       // Generate DAT_W FFs instance per cell //
       base_reg #(.DAT_W(DAT_W)) i_base_reg (
@@ -120,7 +135,16 @@ generate
 endgenerate
 
 // MUX output data from RAM 
-assign mem_dat_out = mem_array[mem_add] ;  
+generate
+   if (WR2RD_OPT) begin: gen_wr2rd_cond
+      wire fwd_dat_cond ; 
+      assign fwd_dat_cond = mem_wen & (mem_add_wr==mem_add_rd) ; 
+      assign mem_dat_out = fwd_dat_cond ? mem_dat_in : mem_array[mem_add_rd] ; 
+   end
+   else begin: gen_rdprev_cond
+      assign mem_dat_out = mem_array[mem_add_rd] ;  
+   end
+endgenerate
 
 // Generate output data-path pipe // 
 pipe #(.DEPTH(DLY_MEM2USER), .WID(DAT_W), .LOW_PWR_OPT(LOW_PWR_OPT)) out_pipe (

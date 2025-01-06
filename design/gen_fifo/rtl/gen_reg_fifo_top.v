@@ -1,5 +1,5 @@
 //
-// gen_fifo_top.v
+// gen_reg_fifo_top.v
 //
 // Description: generic register based FIFO
 //
@@ -10,7 +10,7 @@
 //    of the event
 //
 
-module gen_fifo_top #(
+module gen_reg_fifo_top #(
    // Parameters // 
    // ---------- //
    parameter  DEPTH = 16            , // FIFO depth 
@@ -51,17 +51,12 @@ module gen_fifo_top #(
 );
 // Internal Wires //
 // -------------- //
-logic [ADD_W-1:0] address ; 
 logic [ADD_W-1:0] wr_ptr  ; 
 logic [ADD_W-1:0] rd_ptr  ; 
 
-// Internal Logic //
-// -------------- //
-assign address = push ? wr_ptr : rd_ptr ; 
-
 // FIFO Registers // 
 // -------------- //
-gen_reg_mem_top #(.ADD_W(ADD_W), .DAT_W(DAT_W), .DEPTH(DEPTH)) i_gen_reg_mem_top (
+gen_dp_reg_mem_top #(.ADD_W(ADD_W), .DAT_W(DAT_W), .DEPTH(DEPTH)) i_gen_dp_reg_mem_top (
    // Memory dimensions // 
    // General // 
    .clk     (clk          ), // i, 0:0   X logic  , clock signal
@@ -69,7 +64,8 @@ gen_reg_mem_top #(.ADD_W(ADD_W), .DAT_W(DAT_W), .DEPTH(DEPTH)) i_gen_reg_mem_top
    // Input control // 
    .cs      (1'b1         ), // i, 0:0   X logic  , Chip-select
    .wen     (push         ), // i, 0:0   X logic  , Write enable
-   .add     (address      ), // i, ADD_W X logic  , Address
+   .add_rd  (rd_ptr       ), // i, ADD_W X logic  , Address
+   .add_wr  (wr_ptr       ), // i, ADD_W X logic  , Address
    // Input data // 
    .dat_in  (dat_in       ), // i, DAT_W X logic  , Input data
    .bit_sel ({DAT_W{1'b1}}), // i, DAT_W X logic  , bit-select

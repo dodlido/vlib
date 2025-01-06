@@ -1,6 +1,6 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 //|                                                                                    |//
-//| ~~ arb_round_robin ~~                                                              |//
+//| ~~ gen_arb_rr_top ~~                                                               |//
 //|                                                                                    |//
 //| Top-level description:                                                             |//
 //|    1. Round-robin arbiter, lsb highest prio                                        |//
@@ -10,7 +10,7 @@
 //|                                                                                    |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
-module arb_round_robin #(
+module gen_arb_rr_top #(
     parameter WID = 16 // rqsts and grnts bus width in bits
 ) (
     // General // 
@@ -35,19 +35,19 @@ assign mask_grntd   = |(masked_grnts)                        ; // bit-wise or of
 assign grants       = mask_grntd ? masked_grnts : base_grnts ; // Prioritize masked grants
 
 // Basic arbiter instance // 
-arb_strict #(.WID(WID)) i_arb_strict (
+gen_arb_strict_top #(.WID(WID)) i0_arb_strict (
     .rqsts (rqsts       ), 
     .grnts (base_grnts  )
 );
 
 // Masked arbiter instance // 
-arb_strict #(.WID(WID)) i_arb_strict (
+gen_arb_strict_top #(.WID(WID)) i1_arb_strict (
     .rqsts (masked_rqsts), 
     .grnts (masked_grnts)
 );
 
 // Update mask instance // 
-arb_round_robin_update_mask #(.WID(WID)) i_arb_round_robin_update_mask (
+gen_arb_rr_updt_mask #(.WID(WID)) i_arb_round_robin_update_mask (
     .clk   (clk  ),
     .rst_n (rst_n),
     .grnts (grnts),

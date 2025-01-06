@@ -1,5 +1,5 @@
 
-module arb_round_robin_update_mask #(
+module gen_arb_rr_updt_mask #(
     parameter WID = 16 // rqsts and grnts bus width in bits
 ) (
     // General // 
@@ -28,7 +28,7 @@ generate
 endgenerate
 
 // mask FFs // 
-always_ff @( posedge clk, negedge rst_n ) begin
+always_ff @(posedge clk) begin
     if (!rst_n) begin
         mask <= {WID{1'b0}} ; 
     end

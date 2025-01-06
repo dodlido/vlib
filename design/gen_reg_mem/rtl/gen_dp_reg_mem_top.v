@@ -1,9 +1,9 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 //|                                                                                    |//
-//| ~~ gen_reg_mem_top.v ~~                                                            |//
+//| ~~ gen_dp_reg_mem_top.v ~~                                                         |//
 //|                                                                                    |//
 //| Top-level description:                                                             |//
-//|    1. Single-port register based memory                                            |//
+//|    1. Dual-port register based memory                                              |//
 //|                                                                                    |//
 //| Features:                                                                          |//
 //|    1. Parameterized delays:                                                        |//
@@ -22,7 +22,7 @@
 //|                                                                                    |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
-module gen_reg_mem_top #(
+module gen_dp_reg_mem_top #(
     // Memory dimensions // 
     parameter int       DAT_W        =             8 , // data width in bits 
     parameter int       DEPTH        =            32 , // Memory depth (number of words)
@@ -40,7 +40,8 @@ module gen_reg_mem_top #(
     // Input control // 
     input  logic [      0:0] cs      , // Chip-select 
     input  logic [      0:0] wen     , // Write enable
-    input  logic [ADD_W-1:0] add     , // Address  
+    input  logic [ADD_W-1:0] add_wr  , // Write address  
+    input  logic [ADD_W-1:0] add_rd  , // Read address  
     // Input data // 
     input  logic [DAT_W-1:0] dat_in  , // Input data
     input  logic [DAT_W-1:0] bit_sel , // bit-select
@@ -71,7 +72,7 @@ generate
       gen_pipe_top #(.DEPTH(DLY_USER2MEM), .DAT_W(2*DAT_W+ADD_W+1), .LOW_PWR_OPT(LOW_PWR_OPT)) i0_ctrl_pipe (
          .clk      (clk                                          ),
          .rst_n    (rst_n                                        ),
-         .dat_in   ({bit_sel    , dat_in    , add    , masked_wr}),
+         .dat_in   ({bit_sel    , dat_in    , add_wr , masked_wr}),
          .vld_in   (cs                                           ),
          .dat_out  ({mem_bit_sel, mem_dat_in, mem_add, mem_wr   }),
          .vld_out  (mem_cs                                       )
@@ -81,7 +82,7 @@ generate
       gen_pipe_top #(.DEPTH(DLY_USER2MEM), .DAT_W(DAT_W+ADD_W+1), .LOW_PWR_OPT(LOW_PWR_OPT)) i1_ctrl_pipe (
          .clk      (clk                             ),
          .rst_n    (rst_n                           ),
-         .dat_in   ({dat_in    , add    , masked_wr}),
+         .dat_in   ({dat_in    , add_wr , masked_wr}),
          .vld_in   (cs                              ),
          .dat_out  ({mem_dat_in, mem_add, mem_wr   }),
          .vld_out  (mem_cs                          )
@@ -117,7 +118,7 @@ generate
 endgenerate
 
 // MUX output data from RAM 
-assign mem_dat_out = mem_array[mem_add] ;  
+assign mem_dat_out = mem_array[add_rd] ;  
 
 // Generate output data-path pipe // 
 gen_pipe_top #(.DEPTH(DLY_MEM2USER), .DAT_W(DAT_W), .LOW_PWR_OPT(LOW_PWR_OPT)) out_pipe (

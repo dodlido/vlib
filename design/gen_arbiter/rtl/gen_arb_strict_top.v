@@ -1,6 +1,6 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 //|                                                                                    |//
-//| ~~ arb_strict ~~                                                                   |//
+//| ~~ gen_arb_strict_top ~~                                                           |//
 //|                                                                                    |//
 //| Top-level description:                                                             |//
 //|    1. Strict priority, combinational arbiter, lsb highest prio                     |//
@@ -10,7 +10,7 @@
 //|                                                                                    |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
-module arb_strict #(
+module gen_arb_strict_top #(
     parameter WID = 16 // rqsts and grnts bus width in bits
 ) (
     input wire [WID-1:0] rqsts , // Request bus

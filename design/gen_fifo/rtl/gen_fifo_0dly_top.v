@@ -61,7 +61,7 @@ assign int_fifo_push   = push & ~byps_fifo_cond ;
 assign int_fifo_pop    = skid_buff_rdy_out & ~int_fifo_empty ; 
 assign int_fifo_dat_in = dat_in ; 
 // FIFO instance //
-gen_fifo_top #(.DEPTH(DEPTH-1), .DAT_W(DAT_W)) i_gen_fifo_top (
+gen_reg_fifo_top #(.DEPTH(DEPTH-1), .DAT_W(DAT_W)) i_gen_reg_fifo_top (
       // Parameters // 
       // General // 
    .clk       (clk               ), // i, 0:0   X logic  , Clock signal

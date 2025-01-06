@@ -20,7 +20,7 @@
 //|                                                                                    |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
-module al_n2w #(
+module gen_al_n2w_top #(
     parameter WID_IN     =                4  , // Input width in bits
     parameter WID_OUT    =                16 , // Output width in bits
     localparam RATIO_VAL = WID_OUT / WID_IN  , // Ratio (input width / output width)
@@ -28,61 +28,61 @@ module al_n2w #(
     localparam INT_WID   = 32                  // Width of integer in bits
 ) (
     // General // 
-    input wire [0:0]           clk      , // Clock signal
-    input wire [0:0]           rst_n    , // Async reset, active low
+    input  logic                 clk      , // Clock signal
+    input  logic                 rst_n    , // Async reset, active low
     // Input controls // 
-    input wire [0:0]           vld_in   , // Valid input indicator
-    input wire [0:0]           ter      , // Terminate transaction, active high
+    input  logic                 vld_in   , // Valid input indicator
+    input  logic                 ter      , // Terminate transaction, active high
     // Input data // 
-    input wire [WID_IN-1:0]    data_in  , // Input data
+    input  logic [WID_IN-1:0]    data_in  , // Input data
     // Output controls // 
-    output reg [0:0]           vld_out  , // Valid output indicator
+    output logic                 vld_out  , // Valid output indicator
     // Output data // 
-    output reg [WID_OUT-1:0]   data_out , // Output data
+    output logic [WID_OUT-1:0]   data_out , // Output data
     // Output debug // 
-    output reg [RATIO_WID-1:0] ptr      , // Aligner pointer counter
-    output reg                 full     , // Aligner is full
-    output reg                 empty      // Aligner is empty
+    output logic [RATIO_WID-1:0] ptr      , // Aligner pointer counter
+    output logic                 full     , // Aligner is full
+    output logic                 empty      // Aligner is empty
 );
 
 // Internal wires // 
-wire                 clr_ptr_cond ; // condition to clear pointer
-wire [RATIO_WID-1:0] ptr_plus1    ; // pointer plus 1
-wire [RATIO_WID-1:0] ptr_next     ; // next pointer value
-wire                 vld_out_next ; // next valid output indicator
+logic                 clr_ptr_cond ; // condition to clear pointer
+logic                 vld_out_next ; // next valid output indicator
 
 // Aligner internal storage // 
-wire [RATIO_VAL-2:0] [WID_IN-1:0] int_strg ; // Internal storage the size of (RATIO_VAL-1) * WID_IN bits
+logic [RATIO_VAL-2:0] [WID_IN-1:0] int_strg ; // Internal storage the size of (RATIO_VAL-1) * WID_IN bits
+
+// --------------------------------------------------------- //
+// the below instance was generated automatically by enst.py //
+
+gen_cnt_top #(.CNT_W(RATIO_WID)) i_gen_cnt_top (
+       // General // 
+   .clk   (clk                      ), // i, 0:0   X logic  , Clock signal
+   .rst_n (rst_n                    ), // i, 0:0   X logic  , sync reset. active low
+       // Input Controls // 
+   .lim   (RATIO_WID'(RATIO_VAL-1)  ), // i, CNT_W X logic  , Counter limit
+   .inc   (vld_in                   ), // i, 0:0   X logic  , Increment counter
+   .dec   (1'b0                     ), // i, 0:0   X logic  , Decrement counter
+   .clr   (ter                      ), // i, 0:0   X logic  , Clear counter
+       // Output Count // 
+   .count (ptr                      )  // o, CNT_W X logic  , Counter value
+);
+
+// the above instance was generated automatically by enst.py //
+// --------------------------------------------------------- //
 
 // Aligner pointer assignments // 
-assign full         = ({{(INT_WID-RATIO_WID){1'b0}}, ptr} == (RATIO_VAL-1))           ; // ptr reached limit
-assign empty        = (ptr == {RATIO_WID{1'b0}})                                      ; // ptr is all 0's
-assign ptr_plus1    = ptr + {{(RATIO_WID-1){1'b0}},1'b1}                              ; // ptr + 1 
-assign clr_ptr_cond = ((ter) | (vld_in & full))                                       ; // Terminate transaction is active or aligner full and input is valid
-assign ptr_next     = (clr_ptr_cond) ? {RATIO_WID{1'b0}} : (vld_in) ? ptr_plus1 : ptr ; // Clear if condition met, o.w inc only if valid input
-
-// pointer register // 
-always_ff @( posedge clk, negedge rst_n ) begin : ptr_reg
-    if (!rst_n) begin // Reset
-        ptr <= {RATIO_WID{1'b0}} ; 
-    end
-    else begin // Sample next value
-        ptr <= ptr_next ; 
-    end
-end
+assign full  = ptr == RATIO_WID'(RATIO_VAL-1) ; // ptr reached limit
+assign empty = ptr == RATIO_WID'(0)           ; // ptr is all 0's
 
 // Sample aligner internal storage // 
-genvar ii;
+genvar II;
 generate
-    for (ii = 0 ; ii < RATIO_VAL-1 ; ii=ii+1) begin : gen_int_strg_reg_loop
-        base_reg #(.WID(WID_IN)) i_base_reg (
-            .clk       (clk                                                  ),
-            .rst_n     (rst_n                                                ),
-            .en        ((ii == {{(INT_WID-RATIO_WID){1'b0}}, ptr}) & (vld_in)), // Aligner ptr points to me and input is valid
-            .data_in   (data_in                                              ),
-            .data_out  (int_strg[ii]                                         )
-        );
-    end
+   logic [RATIO_VAL-1-1:0] int_strg_we ; 
+   for (II = 0 ; II < RATIO_VAL-1 ; II=II+1) begin : gen_int_strg_reg_loop
+      assign int_strg_we[II] = (ptr == RATIO_WID'(II)) & (vld_in); 
+      always_ff @(posedge clk) if (!rst_n) int_strg[II] <= WID_IN'(0) ; else if (int_strg_we[II]) int_strg[II] <= data_in ; 
+   end
 endgenerate
 
 // valid out logic // 
@@ -90,11 +90,6 @@ assign vld_out = (full & vld_in) ;
 
 // Data output assembly // 
 assign data_out = {data_in, int_strg} ; // Output data is the concat of input data at the MSword and int_strg after that
-
-initial begin
-    $dumpfile("dump.vcd");
-    $dumpvars(1, al_n2w);
-end
 
 endmodule
 
@@ -106,3 +101,5 @@ endmodule
 //| 4. Version  :  v0.6.0                         |//
 //|                                               |//
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
+
+

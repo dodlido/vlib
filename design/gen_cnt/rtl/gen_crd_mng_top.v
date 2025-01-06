@@ -85,21 +85,6 @@ always_ff @(posedge clk) // credit count
    else // sample next
       crd_cnt <= crd_cnt_next ; 
 
-
-initial begin
-   $dumpfile("dump.vcd");
-   $dumpvars(0, gen_crd_mng_top);
-end
-
-initial begin
-   $dumpfile("dump.vcd");
-   $dumpvars(0, gen_crd_mng_top);
-end
-
-initial begin
-   $dumpfile("dump.vcd");
-   $dumpvars(0, gen_crd_mng_top);
-end
 endmodule
 
 

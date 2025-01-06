@@ -125,3 +125,12 @@ assign err_ovfl  = push & sts_full  ;
 assign err_udfl  = pop  & sts_empty ;
 
 endmodule
+
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
+//|                                               |//
+//| 1. Project  :  vlib                           |//
+//| 2. Author   :  Etay Sela                      |//
+//| 3. Date     :  2025-01-07                     |//
+//| 4. Version  :  v0.7.0                         |//
+//|                                               |//
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//

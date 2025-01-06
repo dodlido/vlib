@@ -126,3 +126,11 @@ module gen_fifo_ctrl_mult_ch_top #(
    input  logic           [DAT_W       -1:0] mem_dat_out         // Output data (from memory POV)
 );
 
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
+//|                                               |//
+//| 1. Project  :  vlib                           |//
+//| 2. Author   :  Etay Sela                      |//
+//| 3. Date     :  2025-01-07                     |//
+//| 4. Version  :  v0.7.0                         |//
+//|                                               |//
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//

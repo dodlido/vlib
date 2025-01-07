@@ -13,7 +13,9 @@
 module gen_arb_strict_top #(
     parameter WID = 16 // rqsts and grnts bus width in bits
 ) (
+    // Inputs // 
     input wire [WID-1:0] rqsts , // Request bus
+    // Outputs // 
     output reg [WID-1:0] grnts   // grnts bus
 );
     // Internal wires // 

@@ -14,8 +14,8 @@
 //|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
 
 module gen_pipe_top #(
-   parameter           DEPTH       =    4 , // Pipe depth
-   parameter           DAT_W       =    8 , // Data width
+   parameter           DEPTH       =    2 , // Pipe depth
+   parameter           DAT_W       =    4 , // Data width
    parameter bit [0:0] LOW_PWR_OPT = 1'b1   // Low power mode option 
 ) (
    // General // 
@@ -33,24 +33,32 @@ module gen_pipe_top #(
 logic [DEPTH:0][DAT_W-1:0] pipe_dat ; 
 logic [DEPTH:0]            pipe_vld ; 
 
-// Connecting first stage to input // 
-always_comb begin
-   pipe_dat[0] = dat_in ; 
-   pipe_vld[0] = vld_in ; 
-end
-
 // Pipe internal stages generation // 
 genvar ST ; 
 generate
    for (ST = 0; ST<DEPTH; ST++) begin : gen_pipe_loop
-      always_ff @(posedge clk) begin
-         if (!rst_n) begin
-            pipe_dat[ST+1] <= DAT_W'(0) ; 
-            pipe_vld[ST+1] <= 1'b0      ;
+      if (ST==0) begin : gen_1st_stage_cond 
+         always_ff @(posedge clk) begin
+            if (!rst_n) begin
+               pipe_dat[1] <= DAT_W'(0) ; 
+               pipe_vld[1] <= 1'b0      ;
+            end
+            else if (pipe_vld[ST] | ~LOW_PWR_OPT) begin
+               pipe_dat[1] <= dat_in ; 
+               pipe_vld[1] <= vld_in ;
+            end
          end
-         else if (pipe_vld[ST] | ~LOW_PWR_OPT) begin
-            pipe_dat[ST+1] <= pipe_dat[ST] ; 
-            pipe_vld[ST+1] <= pipe_vld[ST] ;
+      end
+      else begin : gen_2nd_stage_cond
+         always_ff @(posedge clk) begin
+            if (!rst_n) begin
+               pipe_dat[ST+1] <= DAT_W'(0) ; 
+               pipe_vld[ST+1] <= 1'b0      ;
+            end
+            else if (pipe_vld[ST] | ~LOW_PWR_OPT) begin
+               pipe_dat[ST+1] <= pipe_dat[ST] ; 
+               pipe_vld[ST+1] <= pipe_vld[ST] ;
+            end
          end
       end
    end

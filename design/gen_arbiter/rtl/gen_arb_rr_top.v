@@ -32,7 +32,7 @@ wire [    0:0] mask_grntd   ; // Mask granted indicator
 // Internal Logic // 
 assign masked_rqsts = mask & rqsts                           ; // mask input rqsts with current mask
 assign mask_grntd   = |(masked_grnts)                        ; // bit-wise or of all masked grants
-assign grants       = mask_grntd ? masked_grnts : base_grnts ; // Prioritize masked grants
+assign grnts        = mask_grntd ? masked_grnts : base_grnts ; // Prioritize masked grants
 
 // Basic arbiter instance // 
 gen_arb_strict_top #(.WID(WID)) i0_arb_strict (

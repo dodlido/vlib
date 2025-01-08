@@ -11,10 +11,9 @@
 //|    3. Read requests are signaled over the 'rd_' interface                          |//
 //|    4. Clearing channels can be requested over the 'clr_' interface                 |//
 //|    5. Configurations are signaled to this module over the 'cfg_' signals           |//
-//|    6. The block signals a flow-control bit per channel to the user over 'fc_'      |//
-//|    7. The block signals statuses, functional and error interrupts over the 'sts_', |//
+//|    6. The block signals statuses, functional and error interrupts over the 'sts_', |//
 //|       'func_' and 'err_' signals respectivly                                       |//
-//|    8. The 'mem_' interface should be connected to a single port S-RAM              |// 
+//|    7. The 'mem_' interface should be connected to a single port S-RAM              |// 
 //|                                                                                    |//
 //| Theory-of-operation:                                                               |//
 //|    1. Writes are always given a priority, no skid-FIFO is implemented to           |//
@@ -38,17 +37,19 @@
 module gen_fifo_ctrl_mult_ch_top #(
    // User Parameters //
    // --------------- //
-   parameter           CH_N        =    4 , // Number of channels  
-   parameter           ADD_W       =    4 , // Pointers width [bits]
-   parameter           DAT_W       =    4 , // Data width [bits] 
-   parameter           RQST_CRDT_N =    4 , // Number of pending requests the block can hold per channel
-   parameter bit [0:0] RR_ARB_OPT  = 1'b0 , // Set to 1'b1 to use round-robin arbitration of read requests, default is strict-prio
+   parameter           CH_N         =    4 , // Number of channels  
+   parameter           ADD_W        =    4 , // Pointers width [bits]
+   parameter           DAT_W        =    4 , // Data width [bits] 
+   parameter           RQST_CRDT_N  =    4 , // Number of pending requests the block can hold per channel
+   parameter bit [0:0] RR_ARB_OPT   = 1'b0 , // Set to 1'b1 to use round-robin arbitration of read requests, default is strict-prio
+   parameter           DLY_USER2MEM =    0 , // Delay between the user IF to the memory [cycles]
+   parameter           DLY_MEM2USER =    1 , // Delay between the memory instance to the user [cycles]
 
    // Inferred Parameter // 
    // ------------------ //
-   localparam RQST_CRDT_W = $clog2(RQST_CRDT_N) , // Request credit counters width [bits]
-   localparam CH_W        = $clog2(CH_N)        , // Channel index width [bits]
-   localparam CNT_W       = ADD_W + 1             // Counter width [bits]
+   localparam RQST_CRDT_W = $clog2(RQST_CRDT_N) + 1 , // Request credit counters width [bits]
+   localparam CH_W        = $clog2(CH_N)            , // Channel index width [bits]
+   localparam CNT_W       = ADD_W + 1                 // Counter width [bits]
 )(
    // --------------------------------------------------------------- //
    // ------------------------ User Interface ----------------------- // 
@@ -61,7 +62,7 @@ module gen_fifo_ctrl_mult_ch_top #(
    // Configurations //
    // -------------- // 
    input  logic [CH_N-1:0][ADD_W       -1:0] cfg_vec_dat_base  , // Per-Channel data base address configuration 
-   input  logic [CH_N-1:0][ADD_W       -1:0] cfg_vec_dat_size  , // Per-Channel data size configuration 
+   input  logic [CH_N-1:0][CNT_W       -1:0] cfg_vec_dat_size  , // Per-Channel data size configuration 
    input  logic [CH_N-1:0][CNT_W       -1:0] cfg_vec_dat_af_th , // Per-Channel data almost-full threshold
    input  logic [CH_N-1:0][CNT_W       -1:0] cfg_vec_dat_ae_th , // Per-Channel data almost-empty threshold
    input  logic [CH_N-1:0][RQST_CRDT_W -1:0] cfg_vec_crd_af_th , // Per-Channel  credits almost-full threshold per channel
@@ -83,10 +84,6 @@ module gen_fifo_ctrl_mult_ch_top #(
    output logic           [CH_W        -1:0] usr_out_ch_num    , // User Output IF, channel number
    output logic           [DAT_W       -1:0] usr_out_dat       , // User Output IF, data
 
-   // Flow Control // 
-   // ------------ //
-   output logic [CH_N-1:0]                   fc_vec_rqst_rdy_n , // Flow control vector - not ready for new requests, bit per channel
-
    // Output Statuses //
    // --------------- //
    output logic [CH_N-1:0][CNT_W       -1:0] sts_vec_dat_count , // Per-Channel Data FIFO count
@@ -94,7 +91,7 @@ module gen_fifo_ctrl_mult_ch_top #(
    output logic [CH_N-1:0]                   sts_vec_dat_af    , // Per-Channel Data FIFO almost-full
    output logic [CH_N-1:0]                   sts_vec_dat_ae    , // Per-Channel Data FIFO almost-empty
    output logic [CH_N-1:0]                   sts_vec_dat_empty , // Per-Channel Data FIFO empty
-   output logic [CH_N-1:0][CNT_W       -1:0] sts_vec_crd_count , // Per-Channel Credits count
+   output logic [CH_N-1:0][RQST_CRDT_W -1:0] sts_vec_crd_count , // Per-Channel Credits count
    output logic [CH_N-1:0]                   sts_vec_crd_full  , // Per-Channel Credits full
    output logic [CH_N-1:0]                   sts_vec_crd_af    , // Per-Channel Credits almost-full
    output logic [CH_N-1:0]                   sts_vec_crd_ae    , // Per-Channel Credits almost-empty
@@ -102,20 +99,21 @@ module gen_fifo_ctrl_mult_ch_top #(
 
    // Output Interrupts //
    // ----------------- //
-   output logic [CH_N-1:0]                   func_vec_ch_clrd  , // Per-Channel functional interrupt - channel cleared done
    output logic [CH_N-1:0]                   err_vec_dat_ovfl  , // Per-Channel error - data overflow detected
    output logic [CH_N-1:0]                   err_vec_dat_udfl  , // Per-Channel error - data underflow detected
    output logic [CH_N-1:0]                   err_vec_rqst_ovfl , // Per-Channel error - request overflow detected
    output logic [CH_N-1:0]                   err_vec_rqst_udfl , // Per-Channel error - request underflow detected
+   output logic                              err_clr_rqst_ovfl , // Clear request initiated in the middle of the previous clearing process
+   output logic                              func_ch_clrd      , // Functional interrupt - last clear request done
 
    // ----------------------------------------------------------------- //
    // ------------------------ Memory Interface ----------------------- // 
    // ----------------------------------------------------------------- //
    // Input control // 
    // ------------- //
-   input  logic                              mem_cs            , // Chip-select 
-   input  logic                              mem_wen           , // Write enable
-   input  logic           [ADD_W       -1:0] mem_add           , // Address  
+   output logic                              mem_cs            , // Chip-select 
+   output logic                              mem_wen           , // Write enable
+   output logic           [ADD_W       -1:0] mem_add           , // Address  
 
    // Input data // 
    // ---------- //
@@ -126,33 +124,42 @@ module gen_fifo_ctrl_mult_ch_top #(
    input  logic           [DAT_W       -1:0] mem_dat_out         // Output data (from memory POV)
 );
 
+// Type defs and Local Parameters // 
+// ------------------------------ //
+typedef enum bit [1:0] {CLR_IDLE=2'b00, CLR_IN_PROG=2'b01, CLR_DONE=2'b10, CLR_RESERVED=2'b11} clr_sts_e ; 
+
 // Internal Wires //
 // -------------- // 
-logic [CH_N-1:0]            clr_ch_oh        ; 
-logic [CH_N-1:0]            push_ch_oh       ; 
-logic [CH_N-1:0][ADD_W-1:0] rd_ptr_vec ; 
-logic [CH_N-1:0][ADD_W-1:0] wr_ptr_vec ; 
-logic [CH_N-1:0][ADD_W-1:0] addr_vec ; 
-logic [CH_N-1:0]            rd_rqst_ch_oh    ; // This increments credits 
-logic [CH_N-1:0]            crd_exists_ch_oh ; // This signals that credits exist
-logic [CH_N-1:0]            pop_ch_oh        ; // This pops 
+logic                       usr_in_vld_masked     ; 
+logic [CH_N-1:0]            clr_ch_oh             ; 
+logic [CH_W-1:0]            push_rqst_ch_num      ;                                
+logic                       push_rqst_vld         ;                                
+logic [CH_N-1:0]            push_ch_oh            ; 
+logic [CH_N-1:0][ADD_W-1:0] rd_ptr_vec            ; 
+logic [CH_N-1:0][ADD_W-1:0] wr_ptr_vec            ; 
+logic [CH_N-1:0][ADD_W-1:0] addr_vec              ; 
+logic [CH_N-1:0]            rd_rqst_ch_oh         ; // This increments credits 
+logic [CH_N-1:0]            crd_exists_ch         ; // This signals that credits exist
+logic [CH_N-1:0]            pop_ch_oh             ; // This pops , one-hot vector
+logic [CH_W-1:0]            pop_ch_num            ; // encoded version of pop_ch_oh
+logic [CH_W-1:0]            addr_mux_sel          ; // address MUX select signal
+clr_sts_e                   clr_sts_next          ; 
+logic                       clr_ch_crd_exist      ;
+logic [CH_W-1:0]            int_clr_ch_num_next   ;                             
+logic [CH_N-1:0]            int_clr_ch_oh_next    ;                             
+logic [CH_N-1:0]            arb_rd_rqsts_vec      ; 
+logic [CH_N-1:0]            arb_rd_rqsts_clr_mask ; 
+// Internal Registers // 
+// ------------------ //
+clr_sts_e                   clr_sts_curr          ; 
+logic [CH_W-1:0]            int_clr_ch_num        ;                             
 
 // Decoders // 
 // -------- //
-// Decode Clear Requests //
-gen_dec_top #(
-   .DAT_IN_W(CH_W       )  // type: int, default: 2, description: input data width [bits]
-) i_gen_dec_top (
-   // Input data //
-   .dat_in  (clr_ch_num ), // i, DAT_IN_W X logic  , input encoded data
-   .en      (clr_rqst   ), // i, [1]      X logic  , enable bit. output is 0's if this is asserted low
-   // Output data // 
-   .dat_out (clr_ch_oh  )  // o, DAT_OUT_W X logic  , decoded version of dat_in. one-hot vector
-);
 // Decode Read Requests //
 gen_dec_top #(
    .DAT_IN_W(CH_W         )  // type: int, default: 2, description: input data width [bits]
-) i_gen_dec_top (
+) i0_gen_dec_top (
    // Input data //
    .dat_in  (rd_ch_num    ), // i, DAT_IN_W X logic  , input encoded data
    .en      (rd_rqst      ), // i, [1]      X logic  , enable bit. output is 0's if this is asserted low
@@ -161,13 +168,13 @@ gen_dec_top #(
 );
 // Decode Write Requests //
 gen_dec_top #(
-   .DAT_IN_W(CH_W          )  // type: int, default: 2, description: input data width [bits]
-) i_gen_dec_top (
-   // Input data //
-   .dat_in  (usr_in_ch_num ), // i, DAT_IN_W X logic  , input encoded data
-   .en      (usr_in_vld    ), // i, [1]      X logic  , enable bit. output is 0's if this is asserted low
+   .DAT_IN_W(CH_W             )  // type: int, default: 2, description: input data width [bits]
+) i1_gen_dec_top (
+   // Input data // 
+   .dat_in  (push_rqst_ch_num ), // i, DAT_IN_W X logic  , input encoded data
+   .en      (push_rqst_vld    ), // i, [1]      X logic  , enable bit. output is 0's if this is asserted low
    // Output data // 
-   .dat_out (push_ch_oh    )  // o, DAT_OUT_W X logic  , decoded version of dat_in. one-hot vector
+   .dat_out (push_ch_oh       )  // o, DAT_OUT_W X logic  , decoded version of dat_in. one-hot vector
 );
 
 // Generate FIFO controls and Credit Managers // 
@@ -191,12 +198,12 @@ generate
          .crd_used_en  (pop_ch_oh        [CH_IDX] ), // i, [1]        X logic  , credit used enable
          // Output Controls // 
          .crd_cnt      (sts_vec_crd_count[CH_IDX] ), // o, CRD_CNT_W  X logic  , credit count
-         .crd_exist    (crd_exists_ch_oh [CH_IDX] )  // o, [1]        X logic  , credits exist condition. active high
+         .crd_exist    (crd_exists_ch    [CH_IDX] )  // o, [1]        X logic  , credits exist condition. active high
       );
       // Credit statueses //
       assign sts_vec_crd_full [CH_IDX] = sts_vec_crd_count[CH_IDX]==RQST_CRDT_W'(RQST_CRDT_N) ; // full 
-      assign sts_vec_crd_af   [CH_IDX] = sts_vec_crd_count[CH_IDX]>=cfg_vec_crd_af_th         ; // almost-full
-      assign sts_vec_crd_ae   [CH_IDX] = sts_vec_crd_count[CH_IDX]<=cfg_vec_crd_ae_th         ; // almost-empty
+      assign sts_vec_crd_af   [CH_IDX] = sts_vec_crd_count[CH_IDX]>=cfg_vec_crd_af_th[CH_IDX] ; // almost-full
+      assign sts_vec_crd_ae   [CH_IDX] = sts_vec_crd_count[CH_IDX]<=cfg_vec_crd_ae_th[CH_IDX] ; // almost-empty
       assign sts_vec_crd_empty[CH_IDX] = sts_vec_crd_count[CH_IDX]==RQST_CRDT_W'(0)           ; // empty
       assign err_vec_rqst_ovfl[CH_IDX] = sts_vec_crd_full [CH_IDX]& rd_rqst_ch_oh[CH_IDX]     ; // overflow
       assign err_vec_rqst_udfl[CH_IDX] = sts_vec_crd_empty[CH_IDX]& pop_ch_oh    [CH_IDX]     ; // underflow
@@ -214,8 +221,6 @@ generate
          .cfg_ae_th (cfg_vec_dat_ae_th[CH_IDX] ), // i, CNT_W X logic  , almost-empty threshold. anything including and below this value will assert sts_ae
          // Input Controls // 
          .clr       (clr_ch_oh        [CH_IDX] ), // i, 0:0   X logic  , Clear FIFO. reset all pointers to 0 
-            // TODO: this clear is actually a request to start the clearing
-            // process and not the clear itself, fix this later
          .push      (push_ch_oh       [CH_IDX] ), // i, 0:0   X logic  , Write enable active high
          .pop       (pop_ch_oh        [CH_IDX] ), // i, 0:0   X logic  , Output enable active high
          // Output Controls // 
@@ -231,14 +236,25 @@ generate
          .err_udfl  (err_vec_dat_udfl [CH_IDX] )  // o, 0:0   X logic  , error - underflow detected
       );
       assign addr_vec[CH_IDX] = push_ch_oh[CH_IDX] ? wr_ptr_vec[CH_IDX] : rd_ptr_vec[CH_IDX] ; // MUX between read and write pointers
+   end
 endgenerate 
 
 // Arbitrate read requests //
 // ----------------------- // 
-assign arb_rd_rqsts_vec = crd_exists_ch_oh & ~(|(push_ch_oh)) ; // any of the channels requested a read and no channels requested a write
+assign arb_rd_rqsts_vec = arb_rd_rqsts_clr_mask & crd_exists_ch & {CH_N{~usr_in_vld_masked}} ; // any of the channels requested a read and no channels requested a write
 generate 
    if (RR_ARB_OPT) begin: gen_rr_arb_cond
-      // Put a round-robin arbiter here
+      gen_arb_rr_top #(
+         .WID(CH_N)  // type: int, default: 1, description: 
+      ) i_gen_arb_rr_top (
+         // General // 
+         .clk   (clk             ), // i, 0:0 X wire  , Clock signal
+         .rst_n (rst_n           ), // i, 0:0 X wire  , Async reset. active high
+         // Inputs //            )
+         .rqsts (arb_rd_rqsts_vec), // i, WID X wire  , Requests bus
+         // Outputs //           )
+         .grnts (pop_ch_oh       ) // o, WID  X reg   , Grants bus
+      );
    end
    else begin: gen_strict_arb_cond
       gen_arb_strict_top #(
@@ -252,12 +268,88 @@ generate
    end
 endgenerate
 
-// Drive memory interface here //
-// --------------------------- //
-   // Encoder to choose the correct address 
+// Drive memory interface //
+// ---------------------- //
+// Encoder to choose the correct address //
+gen_enc_top #(
+   .DAT_IN_W(CH_N)  // type: int, default: 4, description: input data width [bits]
+) i_gen_enc_top (
+   // Input data //
+   .dat_in  (pop_ch_oh ), // i, DAT_IN_W  X logic  , one-hot decoded vector
+   // Output data // 
+   .dat_out (pop_ch_num)  // o, DAT_OUT_W X logic  , encoded version of the dat_in one-hot vector
+);
+// MUX address to memory // 
+assign addr_mux_sel = usr_in_vld_masked ? usr_in_ch_num : pop_ch_num ; 
+assign mem_add = addr_vec[addr_mux_sel] + cfg_vec_dat_base[addr_mux_sel] ; // adding base as offset to memory address
+// Delay pipe //
+// 1. |pop_ch_oh    -- DLY_USER2MEM + DLY_MEM2USER cycles later --> usr_out_vld
+// 2. usr_in_vld    -- DLY_USER2MEM + DLY_MEM2USER cycles later --> push_rqst_vld 
+// 2. usr_in_ch_num -- DLY_USER2MEM + DLY_MEM2USER cycles later --> push_rqst_ch_num
+gen_pipe_top #(
+   .DEPTH      (DLY_USER2MEM + DLY_MEM2USER), // type: int, default: 4, description: Pipe depth
+   .DAT_W      (1 + CH_W + 1 + CH_W        ), // type: int, default: 8, description: Data width
+   .LOW_PWR_OPT(1'b0                       )  // type: bit, default: 1, description: 
+) i_gen_pipe_top (
+   // General // 
+   .clk     (clk                                                                     ), // i, 0:0   X logic  , clock signal
+   .rst_n   (rst_n                                                                   ), // i, 0:0   X logic  , Async reset. active low
+   // Input data // 
+   .dat_in  ({(|(pop_ch_oh)), pop_ch_num    ,  usr_in_vld_masked  , usr_in_ch_num   }), // i, DAT_W X logic  , Input data
+   .vld_in  (1'b1                                                                    ), // i, 0:0   X logic  , Input valid indicator
+   // Output data // 
+   .dat_out ({usr_out_vld   , usr_out_ch_num, push_rqst_vld       , push_rqst_ch_num}), // o, DAT_W X logic  , Output data
+   .vld_out (                                                                        )  // o, 0:0   X logic  , Output valid indicator
+);
+// Memory IF // 
+assign mem_cs      = 1'b1              ; 
+assign mem_dat_in  = usr_in_dat        ; 
+assign mem_wen     = usr_in_vld_masked ; 
+assign usr_out_dat = mem_dat_in        ;
 
 // Clear Channel FSM //
 // ----------------- //
+// MUX credits exist signal for the cleared channel // 
+assign int_clr_ch_num_next = clr_rqst & clr_sts_curr==CLR_IDLE ? clr_ch_num : int_clr_ch_num ; 
+assign clr_ch_crd_exist = crd_exists_ch[int_clr_ch_num_next] ; 
+// Next state logic // 
+always_comb begin   
+   case (clr_sts_curr)
+      CLR_IDLE   : begin
+         if (clr_rqst & ~clr_ch_crd_exist)
+            clr_sts_next = CLR_DONE ; 
+         else if (clr_rqst) 
+            clr_sts_next = CLR_IN_PROG ; 
+         else 
+            clr_sts_next = CLR_IDLE ; 
+      end
+      CLR_IN_PROG: begin 
+         if (~clr_ch_crd_exist)
+            clr_sts_next = CLR_DONE ; 
+         else
+            clr_sts_next = CLR_IN_PROG ; 
+      end
+      CLR_DONE   : clr_sts_next = CLR_IDLE ; 
+      default    : clr_sts_next = CLR_IDLE ; // SNGH
+   endcase
+end
+// Decode Clear Requests //
+gen_dec_top #(
+   .DAT_IN_W(CH_W       )  // type: int, default: 2, description: input data width [bits]
+) i2_gen_dec_top (
+   // Input data //
+   .dat_in  (int_clr_ch_num_next ), // i, DAT_IN_W X logic  , input encoded data
+   .en      (1'b1                ), // i, [1]      X logic  , enable bit. output is 0's if this is asserted low
+   // Output data // 
+   .dat_out (int_clr_ch_oh_next  )  // o, DAT_OUT_W X logic  , decoded version of dat_in. one-hot vector
+);
+// FSM outputs //
+assign arb_rd_rqsts_clr_mask = clr_sts_curr==CLR_IN_PROG ? int_clr_ch_oh_next : {CH_N{1'b1}} ; 
+assign err_clr_rqst_ovfl = clr_rqst & clr_sts_curr!=CLR_IDLE ; 
+assign func_ch_clrd = clr_sts_curr==CLR_DONE ; 
+assign clr_ch_oh = int_clr_ch_oh_next & {CH_N{clr_sts_curr==CLR_DONE}} ; 
+assign usr_in_vld_masked = usr_in_vld & (int_clr_ch_num_next!=usr_in_ch_num | clr_sts_curr==CLR_IDLE) ; 
 
 endmodule
+
 

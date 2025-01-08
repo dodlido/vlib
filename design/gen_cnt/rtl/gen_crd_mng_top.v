@@ -75,7 +75,7 @@ assign crd_cnt_next = {CRD_CNT_W{inc_y_dec_y_cond}} & inc_y_dec_y_val |
 
 // Output logic // 
 // ------------ // 
-assign crd_exist = crd_cnt >= MAX_CRD_USED_VAL ; 
+assign crd_exist = crd_cnt >= CRD_CNT_W'(MAX_CRD_USED_VAL) ; 
 
 // FFs //
 // --- //

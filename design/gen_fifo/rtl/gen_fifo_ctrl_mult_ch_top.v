@@ -353,3 +353,11 @@ assign usr_in_vld_masked = usr_in_vld & (int_clr_ch_num_next!=usr_in_ch_num | cl
 endmodule
 
 
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//
+//|                                               |//
+//| 1. Project  :  vlib                           |//
+//| 2. Author   :  Etay Sela                      |//
+//| 3. Date     :  2025-01-09                     |//
+//| 4. Version  :  v0.8.0                         |//
+//|                                               |//
+//|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|//

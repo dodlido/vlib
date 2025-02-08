@@ -65,8 +65,8 @@ generate
 endgenerate
 
 // Connecting last stage to output // 
-assign dat_out = pipe_dat[DEPTH] ; 
-assign vld_out = pipe_vld[DEPTH] ; 
+assign dat_out = DEPTH==0 ? dat_in : pipe_dat[DEPTH] ; 
+assign vld_out = DEPTH==0 ? vld_in : pipe_vld[DEPTH] ; 
 
 endmodule
 
